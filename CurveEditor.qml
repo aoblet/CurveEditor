@@ -332,6 +332,7 @@ Rectangle {
                 canvas.yRangeGrid -= 1
                 canvas.requestPaint()
             }
+
         }
 
         onPaint:{
