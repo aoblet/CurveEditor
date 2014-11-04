@@ -1,4 +1,5 @@
 import QtQuick 2.3
+import QtQuick.Controls 1.2
 
 Rectangle {
     width: 500
@@ -34,6 +35,7 @@ Rectangle {
         property int yRangeGrid: 10
         property int scale: 1;
 
+
         function convertEffectToCoord(effect){
             var firstX = pointsCurve.get(0).x; var lastX = pointsCurve.get(pointsCurve.count-1).x;
             var firstY = pointsCurve.get(0).y; var lastY = pointsCurve.get(pointsCurve.count-1).y;
@@ -42,6 +44,15 @@ Rectangle {
             var point ={};
             point.x = ( (effect.x - firstX)/(lastX-firstX) ) * canvas.width;
             point.y = Math.abs(((effect.y - Math.min(firstY,lastY))/distanceYminMax * canvas.height) - canvas.height);
+            point.xBezier1 = point.x;
+            point.yBezier1 = point.y;
+            point.xBezier2 = point.x;
+            point.yBezier2 = point.y;
+
+            if(effect.xBezier1 && effect.yBezier2 && effect.xBezier2 && effect.yBezier2){
+
+            }
+
             return point;
         }
 
@@ -85,9 +96,10 @@ Rectangle {
                 var startPoint = canvas.convertEffectToCoord({x:pointsCurve.get(0).x, y:pointsCurve.get(0).y});
                 ctx.moveTo(startPoint.x,startPoint.y);
                 for(var i=1; i<pointsCurve.count ; ++i){
-                    //ctx.bezierCurveTo(pointsCurve.get(i).x+150,pointsCurve.get(i).y,pointsCurve.get(i).x-150,pointsCurve.get(i).y, pointsCurve.get(i).x,pointsCurve.get(i).y);
+
                     var coordPoint = canvas.convertEffectToCoord({x: pointsCurve.get(i).x, y:pointsCurve.get(i).y});
-                    ctx.lineTo(coordPoint.x,coordPoint.y);
+                    ctx.bezierCurveTo(coordPoint.xBezier1, coordPoint.yBezier1, coordPoint.xBezier2,coordPoint.yBezier2,coordPoint.x,coordPoint.y);
+                    //ctx.lineTo(coordPoint.x,coordPoint.y);
                 }
                 ctx.stroke();
             }
@@ -141,6 +153,7 @@ Rectangle {
             id:canvasMouseArea
             anchors.fill:parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
 
             property bool dragging: false
             property bool pressed: false
@@ -178,31 +191,60 @@ Rectangle {
                 }
             }
 
+            function isPointInRadius(mouse,pointToTest,radius){
+                if( (mouse.x >= pointToTest.x -radius) && (mouse.x <= pointToTest.x +radius) &&
+                    (mouse.y >= pointToTest.y -radius) && (mouse.y <= pointToTest.y +radius))
+                        return true;
+
+                return false;
+            }
+
+            function pointInSelection(mouse,radius){
+                var i=0;
+                var radiusSelect = 15; //px
+                do{
+                    ++i;
+                    var pointToTest = canvas.convertEffectToCoord({x:pointsCurve.get(i).x, y:pointsCurve.get(i).y});
+                }
+                while(i != pointsCurve.count-1 && !isPointInRadius(mouse,pointToTest,radiusSelect))
+                return i;
+            }
+
             onClicked: {
-                if(!dragging){
-                    if(pointsCurve.count > 1){
-                        //verif si compris entre min et max frame
-                        var lastPoint = pointsCurve.count-1;
-                        var coordPointFirst = canvas.convertEffectToCoord({x:pointsCurve.get(0).x, y:pointsCurve.get(0).y});
-                        var coordPointLast = canvas.convertEffectToCoord({x:pointsCurve.get(lastPoint).x, y:pointsCurve.get(lastPoint).y});
+                if(mouse.button == Qt.LeftButton){
+                    if(!dragging){
+                        if(pointsCurve.count > 1){
+                            //verif si compris entre min et max frame
+                            var lastPoint = pointsCurve.count-1;
+                            var coordPointFirst = canvas.convertEffectToCoord({x:pointsCurve.get(0).x, y:pointsCurve.get(0).y});
+                            var coordPointLast = canvas.convertEffectToCoord({x:pointsCurve.get(lastPoint).x, y:pointsCurve.get(lastPoint).y});
 
-                        if(mouse.x > coordPointFirst.x && mouse.x < coordPointLast.x){
-                            var indexToInsert = 0;
-                            while(canvas.convertEffectToCoord({x:pointsCurve.get(indexToInsert).x}).x < mouse.x){
-                                indexToInsert++;
-                            }
+                            if(mouse.x > coordPointFirst.x && mouse.x < coordPointLast.x){
+                                var indexToInsert = 0;
+                                while(canvas.convertEffectToCoord({x:pointsCurve.get(indexToInsert).x}).x < mouse.x){
+                                    indexToInsert++;
+                                }
 
-                            var pointToEffect = canvas.convertCoordToEffect({x:mouse.x, y:mouse.y})
-                            pointsCurve.insert(indexToInsert, {
-                                                   x:pointToEffect.x, y:pointToEffect.y,
-                                                   xBezier1:pointToEffect.x, yBezier1:pointToEffect.y,
-                                                   xBezier2:pointToEffect.x, yBezier2:pointToEffect.y});
-                            canvas.requestPaint();
-                       }
+                                var pointToEffect = canvas.convertCoordToEffect({x:mouse.x, y:mouse.y})
+                                pointsCurve.insert(indexToInsert, {
+                                                       x:pointToEffect.x, y:pointToEffect.y,
+                                                       xBezier1:pointToEffect.x, yBezier1:pointToEffect.y,
+                                                       xBezier2:pointToEffect.x, yBezier2:pointToEffect.y});
+                                canvas.requestPaint();
+                           }
+                        }
+                    }
+
+                    dragging = false;
+                }
+                else{
+                    var i=pointInSelection(mouse,15);
+
+                    if(i<pointsCurve.count -1 ){
+                        pointsCurve.remove(i,1);
+                        canvas.requestPaint();
                     }
                 }
-
-                dragging = false;
             }
 
             onPressed: {
@@ -224,14 +266,7 @@ Rectangle {
                 dragging = true;
 
                 //first and last supposed fixed
-                var i=0;
-                var radiusSelect = 15; //px
-                do{
-                    ++i;
-                    var pointToTest = canvas.convertEffectToCoord({x:pointsCurve.get(i).x, y:pointsCurve.get(i).y});
-                }
-                while(i != pointsCurve.count-1 && !((mouse.x >= pointToTest.x -radiusSelect) && (mouse.x <= pointToTest.x +radiusSelect) &&
-                                                    (mouse.y >= pointToTest.y -radiusSelect) && (mouse.y <= pointToTest.y +radiusSelect) ))
+                var i=pointInSelection(mouse,15);
 
                 if(pointDraggingIndex != -1 && pointDraggingIndex != i){
                     return;
@@ -257,6 +292,45 @@ Rectangle {
                     pressed = false;
                     toolTipPoint.text="";
                 }
+            }
+        }
+
+        Button{
+            id: upXR
+            text:"Size up Xrange";
+            onClicked: {
+                canvas.xRangeGrid += 1
+                canvas.requestPaint()
+            }
+        }
+
+        Button{
+            id:dnXR
+            anchors.left: upXR.right
+            text:"Size down Xrange";
+            onClicked: {
+                canvas.xRangeGrid -= 1
+                canvas.requestPaint()
+            }
+        }
+
+        Button{
+            id:upYR
+            anchors.left: dnXR.right
+            text:"Size up yrange";
+            onClicked: {
+                canvas.yRangeGrid += 1
+                canvas.requestPaint()
+            }
+        }
+
+        Button{
+            id:dnYR
+            anchors.left: upYR.right
+            text:"Size down yrange";
+            onClicked: {
+                canvas.yRangeGrid -= 1
+                canvas.requestPaint()
             }
         }
 
