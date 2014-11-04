@@ -64,7 +64,14 @@ Window {
                 id:nbPointDisplay
                 readOnly: true
                 Layout.preferredWidth: parent.width
-                text: "nb points: "+ pointsCurve.count
+                text: "nb Points: "+ pointsCurve.count
+            }
+
+            TextField{
+                id:draggedPoint
+                readOnly: true
+                Layout.preferredWidth: parent.width
+                placeholderText:qsTr("draggedPoint")
             }
 
             Button{
@@ -347,6 +354,7 @@ Window {
                 onReleased: {
                     pressed=false;
                     pointDraggingIndex = -1;
+                    draggedPoint.text = "";
                 }
 
                 onPositionChanged:  {
@@ -370,13 +378,16 @@ Window {
                             var pointPrevious = canvas.convertEffectToCoord({x:pointsCurve.get(i-1).x ,y:pointsCurve.get(i-1).y});
 
                             if(mouse.x >= pointNext.x)
-                                pointsCurve.get(i).x = canvas.convertCoordToEffect({x:pointNext.x -1}).x;
+                                pointsCurve.get(i).x = Math.ceil(canvas.convertCoordToEffect({x:pointNext.x -1}).x);
                             else if(mouse.x <= pointPrevious.x)
-                                pointsCurve.get(i).x = canvas.convertCoordToEffect({x:pointPrevious.x +1}).x;
+                                pointsCurve.get(i).x = Math.ceil(canvas.convertCoordToEffect({x:pointPrevious.x +1}).x);
                             else
-                                pointsCurve.get(i).x = canvas.convertCoordToEffect({x:mouse.x}).x;
+                                pointsCurve.get(i).x = Math.ceil(canvas.convertCoordToEffect({x:mouse.x}).x);
 
-                            pointsCurve.get(i).y = canvas.convertCoordToEffect({y:mouse.y}).y;
+                            pointsCurve.get(i).y = Math.ceil(canvas.convertCoordToEffect({y:mouse.y}).y);
+
+                            if(pointDraggingIndex != -1)
+                                draggedPoint.text = pointsCurve.get(pointDraggingIndex).x +", "+pointsCurve.get(pointDraggingIndex).y;
 
                             canvas.requestPaint();
                             pointDraggingIndex=i;
